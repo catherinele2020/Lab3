@@ -1,28 +1,171 @@
 ---
-title: ""
-author: ""
-format:
-  html:
-    embed-resources: true
+title: "Lab 03"
+format: html
+editor: visual
 ---
 
-## Quarto
+## Lab 03 by Catherine Le
 
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
+### 1. Read in the data
 
-## Running Code
-
-When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
+Sorry, this output is messy but I wasn't sure how to hide the output. I only know that the echo false will hide the code and not the output
 
 ```{r}
-1 + 1
+
+library(R.utils)
+library(data.table)
+library(tidyverse)
+library(leaflet)
+
+download.file(
+  "https://raw.githubusercontent.com/USCbiostats/data-science-data/master/02_met/met_all.gz",
+  destfile = file.path("~", "Downloads", "met_all.gz"),
+  method   = "libcurl",
+  timeout  = 60
+)
+
+met <- data.table::fread(file.path("~", "Downloads", "met_all.gz"))
 ```
 
-You can add options to executable code like this
+### **2. Check the dimensions, headers, footers.**
+
+There are 2,317,218 observations, 30 columns, and 6 rows.
 
 ```{r}
-#| echo: false
-2 * 2
+dim(met)
+# head() will display the first few rows
+head(met)
+# tail() will display the last few rows
+tail(met)
 ```
 
-The `echo: false` option disables the printing of code (only output is displayed).
+### **3. Take a look at the variables.**
+
+```{r}
+# displays a summary of the met dataset
+str(met)
+```
+
+### **4. A closer look at the key variables**
+
+```{r}
+table(met$year)
+table(met$day)
+table(met$hour)
+
+summary(met$temp)
+summary(met$elev)
+summary(met$wind.sp)
+```
+
+Changing elevation that is above 9999.0 to NA (missing values).
+
+```{r}
+met[met$elev==9999.0] <- NA
+summary(met$elev)
+```
+
+\-- The weather station with the highest elevation is **4113 meters** (the max value in the summary table).
+
+Removing temperatures less than 40 degrees Celsius because these are suspicious numbers.
+
+```{r}
+met <- met[temp>-40]
+met2 <- met[order(temp)]
+head(met2)
+```
+
+### **5. Check data against an external data source**
+
+Removing temperatures that are greater than -15 degrees Celsius to have a more reasonable range of temperatures for this elevation.
+
+```{r}
+met <- met[temp>-15]
+met2 <- met[order(temp)]
+head(met2)
+```
+
+### **6. Summary Statistics**
+
+```{r}
+# selecting weather station with max elevation
+elev <- met[elev==max(elev), ]
+summary(elev)
+```
+
+Correlations
+
+```{r}
+# finding the correlation between temperature and wind speed
+cor(elev$temp, elev$wind.sp, use="complete")
+# correlation between temp and hour
+cor(elev$temp, elev$hour, use="complete")
+# correlation between wind speed and day 
+cor(elev$wind.sp, elev$day, use="complete")
+# correlation between wind speed and hour
+cor(elev$wind.sp, elev$hour, use="complete")
+# correlation between temp and day
+cor(elev$temp, elev$day, use="complete")
+```
+
+### **7. Exploratory Graphs**
+
+Histograms
+
+```{r}
+# histogram of elevation data with 100 bars
+hist(met$elev, breaks=100)
+```
+
+Histogram above shows data is right skewed.
+
+```{r}
+# histogram of temp data
+hist(met$temp)
+```
+
+Histogram above has a normal distribution
+
+```{r}
+# histogram of wind speed
+hist(met$wind.sp)
+```
+
+Histogram above shows data that is right skewed
+
+```{r}
+# geograhical map of the weather station with the highest elevation
+# loading magrittr to read the piping symobls
+library(magrittr)
+leaflet(elev) %>%
+  addProviderTiles('OpenStreetMap') %>% 
+  addCircles(lat=~lat,lng=~lon, opacity=1, fillOpacity=1, radius=100)
+```
+
+```{r}
+# creating a date-time variable for the x-axis
+library(lubridate)
+elev$date <- with(elev, ymd_h(paste(year, month, day, hour, sep= ' ')))
+summary(elev$date)
+```
+
+```{r}
+# ordering by increasing date
+elev <- elev[order(date)]
+head(elev)
+# looking at the first couple of rows
+```
+
+Plotting the date-time variable we just created
+
+```{r}
+plot(elev$date, elev$temp, type='l')
+```
+
+The temperatures seem to be high around August 6th and August 20th. The temperatures were at an all-time low at August 27th
+
+```{r}
+plot(elev$date, elev$wind.sp, type='l')
+```
+
+The wind speed was at a high on August 17th and August 27th.
